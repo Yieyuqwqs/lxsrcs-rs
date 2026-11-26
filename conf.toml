@@ -1,0 +1,146 @@
+# 配置版本（与 Go 版保持一致，便于直接复用现有 conf.toml）
+Version = '1.1.0'
+
+[Main]
+Debug = false
+Listen = '127.0.0.1:1101'
+Proxy = false
+RealIP = ''
+Cors = false
+LogFile = 'data/log/000000.log'
+Console = true
+
+[Logs]
+Enable = true
+Dir = 'data/log/'
+Fmt = '2006/01/02'
+Max = 4194304
+
+[Apis]
+WebLog = false
+ApiOnly = true
+
+[Auth]
+[Auth.BanList]
+Enable = false
+Strict = false
+White = ['127.0.0.1', '192.168.0.0/16']
+Black = []
+
+[Auth.RateLimit]
+Enable = false
+Block = 30
+Globle = 60
+Single = 15
+BanNum = 5
+BanTim = 10
+
+[Auth.ApiPass]
+Enable = false
+Auto = false
+Value = ''
+
+[Auth.UniPass]
+Enable = false
+[Auth.UniPass.Pool]
+
+[Srcs]
+[Srcs.Bn]
+GDStudio = false
+Toubiec = false
+Vkeys = false
+
+[Srcs.Wy]
+Enable = true
+Prefetch = true
+FakeIP = ''
+AdFree = false
+
+[[Srcs.Wy.Group]]
+Enable = true
+
+[[Srcs.Wy.Group.Node]]
+Enable = false
+Name = ''
+Cookie = ''
+Refresh = false
+DailyTask = false
+DailyListen = false
+
+[Srcs.Mg]
+Enable = true
+
+[Srcs.Kw]
+Enable = true
+Source = ''
+FakeIP = ''
+
+[Srcs.Kg]
+Enable = true
+FakeIP = ''
+
+[[Srcs.Kg.Node]]
+Enable = false
+Plat = 0
+UserId = ''
+Token = ''
+Mid = ''
+Dfid = ''
+Device = ''
+Refresh = false
+LiteSignin = false
+
+[Srcs.Tx]
+Enable = false
+[[Srcs.Tx.Node]]
+Enable = true
+Guid = ''
+Uuin = ''
+Ukey = ''
+Refresh = false
+
+[Srcs.Bi]
+Enable = false
+CDN = 'upos-sz-mirrorcoso1.bilivideo.com'
+
+[Srcs.Lx]
+Enable = false
+[[Srcs.Lx.Node]]
+Enable = false
+Plat = []
+Addr = ''
+Pass = ''
+UA = ''
+Head = ''
+
+[Lxcs]
+Name = '🍁'
+Desc = ''
+Vers = ''
+Auth = ''
+Home = ''
+
+[Data]
+Mode = 2
+Type = 0
+
+[Data.Rule]
+ExcP = false
+Plat = ['wy', 'mg', 'kw', 'kg', 'tx']
+ExcQ = true
+Qual = ['128k', '192k', '320k', 'flac', 'flac24bit']
+
+[Data.Local]
+Path = 'data/cache'
+Bind = ''
+Expi = 1800
+Sign = ''
+Acip = false
+Dyna = false
+
+[Memo]
+Shards = 256
+
+[Errs]
+Expi = 120
+ErrMp3 = ''
