@@ -6,6 +6,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
+    middleware,
     routing::get,
     Json, Router,
 };
@@ -26,6 +27,7 @@ pub fn build(state: Arc<AppState>) -> Router {
         .route("/api/v1/search", get(search))
         .route("/api/v1/file/{kind}/{name}", get(error_file))
         .fallback(not_found)
+        .layer(middleware::from_fn(crate::access::access_log))
         .with_state(state)
 }
 
