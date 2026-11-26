@@ -1,6 +1,6 @@
 [package]
 name = "lxsrcs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.80"
 description = "LX-Source 的 Rust 实现：洛雪音乐自定义源服务端（与 Go 版 /api/v0 线格式兼容）"
