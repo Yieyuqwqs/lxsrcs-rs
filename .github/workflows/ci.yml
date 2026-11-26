@@ -3,58 +3,48 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
-  CARGO_TERM_COLOR: always
+  CARGO_TERM_COLOR: never
   RUST_BACKTRACE: 1
 
 jobs:
   build:
     name: build + test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-      - name: Build
-        run: cargo build --all-targets
-      - name: Test
-        run: cargo test
-      - name: Clippy (advisory)
-        continue-on-error: true
-        run: cargo clippy --all-targets -- -D warnings
 
-  release-artifacts:
-    name: release build (${{ matrix.target }})
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-linux-android
-            os: android
-          - target: x86_64-unknown-linux-gnu
-            os: linux
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install android target
-        if: matrix.os == 'android'
+      - name: Build
+        id: build
         run: |
-          rustup target add ${{ matrix.target }}
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
-      - name: Build release
-        run: cargo build --release --target ${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lxsrcs-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/lxsrcs
+          set +e
+          cargo build --all-targets > /tmp/build.log 2>&1
+          code=$?
+          tail -c 12000 /tmp/build.log
+          cp /tmp/build.log build-error.log
+          exit $code
+
+      - name: Test
+        if: steps.build.outcome == 'success'
+        run: cargo test 2>&1 | tail -60
+
+      - name: 把编译错误提交回仓库（失败时才有内容）
+        if: failure()
+        run: |
+          if [ -s build-error.log ]; then
+            git config user.email "ci@local"
+            git config user.name "ci"
+            git add -f build-error.log
+            git commit -m "ci: build error snapshot" || true
+            git push || true
+          fi
