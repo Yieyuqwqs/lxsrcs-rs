@@ -14,10 +14,9 @@ pub fn krc_to_lrc(raw: &[u8]) -> String {
     }
     use std::io::Read;
     let mut out = String::new();
-    if let Ok(mut decoder) = flate2::read::ZlibDecoder::new(&data[..]) {
-        if decoder.read_to_string(&mut out).is_ok() && !out.is_empty() {
-            return krc_text_to_lrc(&out);
-        }
+    let mut decoder = flate2::read::ZlibDecoder::new(&data[..]);
+    if decoder.read_to_string(&mut out).is_ok() && !out.is_empty() {
+        return krc_text_to_lrc(&out);
     }
     // 不是压缩体（服务端偶尔直接给 lrc 文本）
     String::from_utf8_lossy(raw).to_string()
