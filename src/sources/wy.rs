@@ -215,7 +215,7 @@ pub async fn search(st: &AppState, keyword: &str, page: u32, size: u32) -> Resul
     // `cloudsearch` 不带 csrf 会回 50000005，实测 `search/suggest/web` 匿名可用
     let json = weapi(st, "search/suggest/web", &body, "https://music.163.com/search/").await?;
     let result = json.get("result").cloned().unwrap_or(Value::Null);
-    let items = result
+    let items: Vec<MusicInfo> = result
         .get("songs")
         .and_then(Value::as_array)
         .map(|arr| arr.iter().filter_map(parse_detail_item).collect())
