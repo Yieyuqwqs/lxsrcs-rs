@@ -3,7 +3,7 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{
-    extract::{ConnectInfo, Path, Query, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::get,
@@ -29,19 +29,16 @@ pub fn build(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
-fn host_of(headers: &HeaderMap, addr: Option<SocketAddr>) -> String {
+fn host_of(headers: &HeaderMap) -> String {
     if let Some(host) = headers.get("host").and_then(|v| v.to_str().ok()) {
         let proto = headers.get("x-forwarded-proto").and_then(|v| v.to_str().ok()).unwrap_or("http");
         return format!("{proto}://{host}");
     }
-    match addr {
-        Some(a) => format!("http://{}", a),
-        None => "http://127.0.0.1".to_string(),
-    }
+    "http://127.0.0.1".to_string()
 }
 
-async fn root(State(st): State<Arc<AppState>>, headers: HeaderMap, addr: Option<ConnectInfo<SocketAddr>>) -> Response {
-    if let Some(resp) = precheck(&st, &headers, &HashMap::new(), addr.map(|a| a.0)) {
+async fn root(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if let Some(resp) = precheck(&st, &headers, &HashMap::new()) {
         return resp;
     }
     let mut source = serde_json::Map::new();
@@ -68,12 +65,12 @@ async fn root(State(st): State<Arc<AppState>>, headers: HeaderMap, addr: Option<
     Json(body).into_response()
 }
 
-async fn script(State(st): State<Arc<AppState>>, headers: HeaderMap, params: Params, addr: Option<ConnectInfo<SocketAddr>>) -> Response {
+async fn script(State(st): State<Arc<AppState>>, headers: HeaderMap, params: Params) -> Response {
     let query = params.0;
-    if let Some(resp) = precheck(&st, &headers, &query, addr.map(|a| a.0)) {
+    if let Some(resp) = precheck(&st, &headers, &query) {
         return resp;
     }
-    let host = host_of(&headers, addr.map(|a| a.0));
+    let host = host_of(&headers);
     let key = auth::key_from_request(&headers, &query).unwrap_or_default();
     let body = util::render_script(&st.cfg, &st.script, &format!("{host}/api/v0/"), &key);
     if query.contains_key("raw") {
@@ -97,7 +94,6 @@ async fn v0(
     Path(path): Path<String>,
     Query(query): Params,
     headers: HeaderMap,
-    addr: Option<ConnectInfo<SocketAddr>>,
 ) -> Response {
     let segments: Vec<&str> = path.trim_matches('/').split('/').collect();
     if segments.len() < 3 {
@@ -106,14 +102,14 @@ async fn v0(
     let (method, plat, id) = (segments[0].to_string(), segments[1].to_string(), segments[2].to_string());
     let qual = segments.get(3).map(|s| s.to_string()).unwrap_or_default();
     
-    if let Some(resp) = precheck(&st, &headers, &query, addr.map(|a| a.0)) {
+    if let Some(resp) = precheck(&st, &headers, &query) {
         return resp;
     }
     if !sources::verify_id(&plat, &id) {
         return Resp::bad(sources::E_ID).into_response();
     }
     st.stats.bump_access();
-    let host = host_of(&headers, addr.map(|a| a.0));
+    let host = host_of(&headers);
     let jmp = query.contains_key("jmp");
 
     match method.as_str() {
@@ -174,7 +170,7 @@ async fn resolve_link(st: &Arc<AppState>, plat: &str, id: &str, qual: &str, host
             if st.cfg.data.type_ == 0 {
                 st.file.set(&key, &link.url, now_secs() + st.cfg.data.local.expi);
             }
-            Ok(Resp::ok(serde_json::json!(link.url)).ok_ext(serde_json::json!({ "qual": link.qual, "expi": link.expi })))
+            Ok(Resp::ok(serde_json::json!(link.url)).with_ext(serde_json::json!({ "qual": link.qual, "expi": link.expi })))
         }
         Err(msg) => Err(msg),
     }
@@ -189,8 +185,8 @@ fn fail_resp(st: &Arc<AppState>, host: &str, msg: String) -> Resp {
     Resp::fail(msg).with_ext(serde_json::json!({ "qual": "temp", "expi": now_secs() + st.cfg.errs.expi })).fallback_audio(&audio)
 }
 
-async fn search(State(st): State<Arc<AppState>>, Query(query): Params, headers: HeaderMap, addr: Option<ConnectInfo<SocketAddr>>) -> Response {
-    if let Some(resp) = precheck(&st, &headers, &query, addr.map(|a| a.0)) {
+async fn search(State(st): State<Arc<AppState>>, Query(query): Params, headers: HeaderMap) -> Response {
+    if let Some(resp) = precheck(&st, &headers, &query) {
         return resp;
     }
     let plat = query.get("pt").cloned().unwrap_or_else(|| "wy".to_string());
@@ -234,8 +230,8 @@ async fn not_found() -> Response {
 }
 
 /// 统一前置检查：密钥 → IP 黑白名单 → 限流。
-fn precheck(st: &Arc<AppState>, headers: &HeaderMap, query: &HashMap<String, String>, addr: Option<SocketAddr>) -> Option<Response> {
-    let ip = st.client_ip(headers, addr.map(|a| a.ip()));
+fn precheck(st: &Arc<AppState>, headers: &HeaderMap, query: &HashMap<String, String>) -> Option<Response> {
+    let ip = st.client_ip(headers, None);
     if !auth::ip_allowed(&st.cfg, ip) {
         return Some(Resp::banned("IP 已被封禁").into_response());
     }
