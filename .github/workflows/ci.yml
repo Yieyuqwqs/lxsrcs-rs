@@ -15,14 +15,13 @@ env:
 jobs:
   build:
     name: build + test
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
       - name: Build
         id: build
@@ -38,13 +37,57 @@ jobs:
         if: steps.build.outcome == 'success'
         run: cargo test 2>&1 | tail -60
 
-      - name: 把编译错误提交回仓库（失败时才有内容）
+      - name: 编译错误回传（失败时）
         if: failure()
         run: |
           if [ -s build-error.log ]; then
             git config user.email "ci@local"
             git config user.name "ci"
             git add -f build-error.log
-            git commit -m "ci: build error snapshot" || true
+            git commit -m "ci: build error snapshot [skip ci]" || true
             git push || true
           fi
+
+  android:
+    name: 交叉编译 aarch64-linux-android
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+
+      - name: Build for Termux
+        run: |
+          set -euo pipefail
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/aarch64-linux-android24-clang"
+          export CC_aarch64_linux_android="$CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER"
+          export AR_aarch64_linux_android="$TOOLCHAIN/llvm-ar"
+          cargo build --release --target aarch64-linux-android
+          mkdir -p dist
+          "$TOOLCHAIN/llvm-strip" target/aarch64-linux-android/release/lxsrcs
+          cp target/aarch64-linux-android/release/lxsrcs dist/lxsrcs-aarch64-linux-android
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: lxsrcs-aarch64-linux-android
+          path: dist/lxsrcs-aarch64-linux-android
+
+      - name: 把二进制推回仓库
+        run: |
+          set -e
+          ls -lh dist/
+          git config user.email "ci@local"
+          git config user.name "ci"
+          git add -f dist/lxsrcs-aarch64-linux-android
+          if git diff --cached --quiet; then echo "二进制无变化"; exit 0; fi
+          git commit -m "build: lxsrcs aarch64-linux-android [skip ci]"
+          git push
