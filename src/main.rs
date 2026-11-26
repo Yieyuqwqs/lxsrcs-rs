@@ -52,7 +52,7 @@ async fn main() {
     println!("监听 127.0.0.1:{}", listen.rsplit(':').next().unwrap_or("1101"));
     println!("自定义源脚本: http://{listen}/api/v0/lx-script.js");
 
-    if let Err(err) = axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+    if let Err(err) = axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
     {
