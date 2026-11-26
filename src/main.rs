@@ -2,6 +2,7 @@
 //!
 //! 启动：`lxsrcs [配置路径]`，默认读当前目录 `conf.toml`。
 
+mod access;
 mod auth;
 mod cache;
 mod config;
@@ -48,7 +49,9 @@ async fn main() {
         }
     };
 
-    println!("LX-Source-RS v{} 已启动", state.version);
+    access::set_console(state.cfg.main.console);
+    let platforms = sources::PLATFORMS.iter().filter(|p| sources::qualities(&state.cfg, p).is_some()).count();
+    access::log_startup(&listen, &state.version, platforms);
     println!("监听 127.0.0.1:{}", listen.rsplit(':').next().unwrap_or("1101"));
     println!("自定义源脚本: http://{listen}/api/v0/lx-script.js");
 
